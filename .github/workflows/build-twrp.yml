@@ -84,6 +84,17 @@ jobs:
             exit 1
           fi
 
+      - name: Satisfy legacy magisk prebuilt check
+        run: |
+          cd "$RUNNER_TEMP/twrp/external/magisk-prebuilt"
+          # Upstream migrated this project to Soong in Aug 2026 and dropped
+          # Android.mk, but the TB322FC recovery branch still globs for it.
+          # The migration commit itself left a zero-byte Android.mk, so match
+          # that state; the actual binaries come from prebuilt/Android.bp.
+          test -f prebuilt/Android.bp
+          if [ ! -s Android.mk ]; then : > Android.mk; fi
+          ls -l Android.mk prebuilt/Android.bp
+
       - name: Install device tree
         run: |
           cd "$RUNNER_TEMP/twrp"
