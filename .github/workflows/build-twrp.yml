@@ -1,0 +1,114 @@
+name: Build TWRP recovery for Y700 gen4 (TB322FC)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - device/lenovo/TB322FC/**
+      - tools/**
+      - .github/workflows/build-twrp.yml
+
+env:
+  MANIFEST_URL: https://github.com/TWRP-Test/platform_manifest_twrp_aosp.git
+  MANIFEST_BRANCH: twrp-16.0
+  RECOVERY_REPO: https://github.com/polygraphene/android_bootable_recovery.git
+  RECOVERY_BRANCH: twrp-16.0-TB322FC
+  RECOVERY_COMMIT: ced4ad75f311fc8a3350e21de415c23d5f0aec74
+  DEVICE_PATH: device/lenovo/TB322FC
+  LUNCH_TARGET: twrp_TB322FC
+  RECOVERY_PARTITION_BYTES: "104857600"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+
+    steps:
+      - name: Checkout device tree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost \
+            "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}"
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git-core gnupg flex bison build-essential zip unzip curl wget \
+            zlib1g-dev libncurses-dev libxml2-utils xsltproc fontconfig \
+            python3 rsync ccache lz4 cpio repo
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global color.ui false
+          repo --version | head -n 2
+
+      - name: Sync TWRP manifest
+        working-directory: ${{ runner.temp }}/twrp
+        run: |
+          mkdir -p "$PWD"
+          repo init --depth=1 -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH"
+          repo sync -c --no-tags --optimized-fetch -j$(nproc) 2>&1 | tail -n 40
+          df -h /
+
+      - name: Apply TB322FC recovery patches
+        working-directory: ${{ runner.temp }}/twrp/bootable/recovery
+        run: |
+          git fetch --depth=1 "$RECOVERY_REPO" "$RECOVERY_BRANCH"
+          git checkout -f FETCH_HEAD
+          actual=$(git rev-parse HEAD)
+          echo "recovery HEAD: $actual"
+          if [ "$actual" != "$RECOVERY_COMMIT" ]; then
+            echo "::error::recovery commit $actual 与锁定值 $RECOVERY_COMMIT 不一致"
+            exit 1
+          fi
+
+      - name: Install device tree
+        working-directory: ${{ runner.temp }}/twrp
+        run: |
+          mkdir -p "$(dirname "$DEVICE_PATH")"
+          cp -a "$GITHUB_WORKSPACE/$DEVICE_PATH" "$DEVICE_PATH"
+          find "$DEVICE_PATH" -maxdepth 1 -mindepth 1 | sort
+
+      - name: Build recoveryimage
+        working-directory: ${{ runner.temp }}/twrp
+        run: |
+          set -o pipefail
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export LC_ALL=C
+          source build/envsetup.sh
+          lunch "$LUNCH_TARGET"
+          m -j$(nproc) recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          ls -l "out/target/product/${LUNCH_TARGET#twrp_}/recovery.img"
+
+      - name: Verify recovery image
+        run: |
+          python3 tools/verify_recovery_image.py \
+            "${{ runner.temp }}/twrp/out/target/product/TB322FC/recovery.img" \
+            --partition-size "$RECOVERY_PARTITION_BYTES" \
+            --require-empty-kernel
+          sha256sum "${{ runner.temp }}/twrp/out/target/product/TB322FC/recovery.img" \
+            | tee "$GITHUB_WORKSPACE/recovery.img.sha256"
+
+      - name: Upload recovery image
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: twrp-recovery-TB322FC
+          path: |
+            ${{ runner.temp }}/twrp/out/target/product/TB322FC/recovery.img
+            recovery.img.sha256
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: twrp-build-log
+          path: |
+            build.log
+          if-no-files-found: warn
