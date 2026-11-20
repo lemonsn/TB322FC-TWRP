@@ -81,6 +81,14 @@ jobs:
           set -o pipefail
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
+          (
+            while true; do
+              sleep 30
+              echo "[heartbeat $(date -u +%H:%M:%SZ)] mem_used:$(free -m | awk '/Mem:/{print $3"M/"$2"M"}') disk:$(df -h . | awk 'NR==2{print $5}') busiest:$(ps -eo comm=,rss= --sort=-rss | head -n 1)"
+            done
+          ) &
+          heartbeat=$!
+          trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
           source build/envsetup.sh
           lunch "$LUNCH_TARGET"
           m -j$(nproc) recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
