@@ -49,9 +49,9 @@ jobs:
           repo --version | head -n 2
 
       - name: Sync TWRP manifest
-        working-directory: ${{ runner.temp }}/twrp
         run: |
-          mkdir -p "$PWD"
+          mkdir -p "$RUNNER_TEMP/twrp"
+          cd "$RUNNER_TEMP/twrp"
           repo init --depth=1 -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH"
           repo sync -c --no-tags --optimized-fetch -j$(nproc) 2>&1 | tail -n 40
           df -h /
@@ -69,15 +69,15 @@ jobs:
           fi
 
       - name: Install device tree
-        working-directory: ${{ runner.temp }}/twrp
         run: |
+          cd "$RUNNER_TEMP/twrp"
           mkdir -p "$(dirname "$DEVICE_PATH")"
           cp -a "$GITHUB_WORKSPACE/$DEVICE_PATH" "$DEVICE_PATH"
           find "$DEVICE_PATH" -maxdepth 1 -mindepth 1 | sort
 
       - name: Build recoveryimage
-        working-directory: ${{ runner.temp }}/twrp
         run: |
+          cd "$RUNNER_TEMP/twrp"
           set -o pipefail
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
