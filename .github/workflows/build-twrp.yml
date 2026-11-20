@@ -61,6 +61,7 @@ jobs:
           sudo mkswap /tmp/swapfile || true
           sudo swapon /tmp/swapfile || echo "::warning::swap unavailable, continuing without swap"
           sudo swapon --show || true
+          sudo sysctl -w vm.swappiness=100 || true
           free -h
 
       - name: Sync TWRP manifest
@@ -107,7 +108,8 @@ jobs:
           source build/envsetup.sh
           lunch "$LUNCH_TARGET"
           set +e
-          GOMEMLIMIT=6GiB m -j$(nproc) recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          export SOONG_GOMEMLIMIT=10GiB
+          m -j3 recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             echo "build exit code: $status"
