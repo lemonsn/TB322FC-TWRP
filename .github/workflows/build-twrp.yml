@@ -92,17 +92,8 @@ jobs:
             exit 1
           fi
 
-      - name: Fix outdated magisk prebuilt check
-        run: |
-          # TWRP-Test migrated external_magisk-prebuilt to Soong in Aug 2026.
-          # The TB322FC recovery branch still probes the old Android.mk and
-          # aborts, and creating that file is rejected by Soong's
-          # androidmk denylist. Point the probe at the real Soong module
-          # definition instead, matching TWRP-Test's own recovery tree.
-          file="$RUNNER_TEMP/twrp/bootable/recovery/prebuilt/Android.mk"
-          sed -i 's#\$(wildcard external/magisk-prebuilt/Android.mk)#$(wildcard external/magisk-prebuilt/prebuilt/Android.bp)#' "$file"
-          grep -n 'magisk-prebuilt' "$file"
-          test -f "$RUNNER_TEMP/twrp/external/magisk-prebuilt/prebuilt/Android.bp"
+      - name: Patch outdated AOSP assumptions
+        run: python3 "$GITHUB_WORKSPACE/tools/patch_recovery.py" "$RUNNER_TEMP/twrp"
 
       - name: Install device tree
         run: |
