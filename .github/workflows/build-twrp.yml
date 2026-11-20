@@ -92,16 +92,17 @@ jobs:
             exit 1
           fi
 
-      - name: Satisfy legacy magisk prebuilt check
+      - name: Fix outdated magisk prebuilt check
         run: |
-          cd "$RUNNER_TEMP/twrp/external/magisk-prebuilt"
-          # Upstream migrated this project to Soong in Aug 2026 and dropped
-          # Android.mk, but the TB322FC recovery branch still globs for it.
-          # The migration commit itself left a zero-byte Android.mk, so match
-          # that state; the actual binaries come from prebuilt/Android.bp.
-          test -f prebuilt/Android.bp
-          if [ ! -s Android.mk ]; then : > Android.mk; fi
-          ls -l Android.mk prebuilt/Android.bp
+          # TWRP-Test migrated external_magisk-prebuilt to Soong in Aug 2026.
+          # The TB322FC recovery branch still probes the old Android.mk and
+          # aborts, and creating that file is rejected by Soong's
+          # androidmk denylist. Point the probe at the real Soong module
+          # definition instead, matching TWRP-Test's own recovery tree.
+          file="$RUNNER_TEMP/twrp/bootable/recovery/prebuilt/Android.mk"
+          sed -i 's#\$(wildcard external/magisk-prebuilt/Android.mk)#$(wildcard external/magisk-prebuilt/prebuilt/Android.bp)#' "$file"
+          grep -n 'magisk-prebuilt' "$file"
+          test -f "$RUNNER_TEMP/twrp/external/magisk-prebuilt/prebuilt/Android.bp"
 
       - name: Install device tree
         run: |
