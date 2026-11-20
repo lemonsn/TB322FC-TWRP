@@ -48,6 +48,14 @@ jobs:
           git config --global color.ui false
           repo --version | head -n 2
 
+      - name: Add swap for the Soong build
+        run: |
+          sudo fallocate -l 4G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - name: Sync TWRP manifest
         run: |
           mkdir -p "$RUNNER_TEMP/twrp"
@@ -91,8 +99,16 @@ jobs:
           trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
           source build/envsetup.sh
           lunch "$LUNCH_TARGET"
-          m -j$(nproc) recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
-          ls -l "out/target/product/${LUNCH_TARGET#twrp_}/recovery.img"
+          set +e
+          GOMEMLIMIT=6GiB m -j$(nproc) recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "build exit code: $status"
+            echo "=== memory ==="; free -h
+            echo "=== kernel out-of-memory evidence ==="; sudo dmesg | tail -n 60 || true
+            echo "=== last build log lines ==="; tail -n 40 "$GITHUB_WORKSPACE/build.log" || true
+          fi
+          exit "$status"
 
       - name: Verify recovery image
         run: |
