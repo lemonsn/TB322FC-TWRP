@@ -64,6 +64,14 @@ jobs:
           sudo sysctl -w vm.swappiness=100 || true
           free -h
 
+      - name: Restore compiler cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ env.RECOVERY_COMMIT }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ env.RECOVERY_COMMIT }}-
+
       - name: Sync TWRP manifest
         run: |
           mkdir -p "$RUNNER_TEMP/twrp"
@@ -119,6 +127,10 @@ jobs:
           source build/envsetup.sh
           lunch "$LUNCH_TARGET"
           set +e
+          export USE_CCACHE=1
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          export CCACHE_MAXSIZE=2G
+          export CCACHE_EXEC="$(command -v ccache)"
           export SOONG_GOMEMLIMIT=10GiB
           m -j3 recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           status=${PIPESTATUS[0]}
@@ -129,6 +141,10 @@ jobs:
             echo "=== last build log lines ==="; tail -n 40 "$GITHUB_WORKSPACE/build.log" || true
           fi
           exit "$status"
+
+      - name: Show compiler cache stats
+        if: always()
+        run: ccache -s || true
 
       - name: Verify recovery image
         run: |
