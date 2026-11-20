@@ -50,10 +50,17 @@ jobs:
 
       - name: Add swap for the Soong build
         run: |
-          sudo fallocate -l 4G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          if sudo swapon --show | grep -q .; then
+            echo "swap already active"
+            sudo swapon --show
+            free -h
+            exit 0
+          fi
+          sudo dd if=/dev/zero of=/tmp/swapfile bs=1M count=8192 status=none || true
+          sudo chmod 600 /tmp/swapfile || true
+          sudo mkswap /tmp/swapfile || true
+          sudo swapon /tmp/swapfile || echo "::warning::swap unavailable, continuing without swap"
+          sudo swapon --show || true
           free -h
 
       - name: Sync TWRP manifest
