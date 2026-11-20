@@ -18,6 +18,23 @@ LIBINSTALL_HEADER_NEW = (
     '    ],'
 )
 
+MINUITWRP_ANCHOR = (
+    '\tmatches, err := filepath.Glob("external/libdrm/Android.*")\n'
+    '\t_ = matches\n'
+    '\tif err == nil {\n'
+    '\t\tcflags = append(cflags, "-DHAS_DRM")\n'
+    '\t}\n'
+)
+MINUITWRP_ADDITION = (
+    '\n'
+    '\t// The Make build passes TW_BRIGHTNESS_PATH; the Soong port forwards only\n'
+    '\t// the twrpGlobalVars typed config, so the fbdev backlight path was\n'
+    '\t// compiled out and its blank parameter became unused.\n'
+    '\tif brightnessPath := strings.TrimSpace(getMakeVars(ctx, "TW_BRIGHTNESS_PATH")); brightnessPath != "" {\n'
+    '\t\tcflags = append(cflags, fmt.Sprintf("-DTW_BRIGHTNESS_PATH=%q", brightnessPath))\n'
+    '\t}\n'
+)
+
 
 def patch_magisk_probe(root):
     path = root / "bootable/recovery/prebuilt/Android.mk"
@@ -43,6 +60,18 @@ def patch_libinstall_headers(root):
     print("libinstall += libupdate_engine_headers")
 
 
+def patch_minuitwrp_brightness(root):
+    path = root / "bootable/recovery/minuitwrp/libminuitwrp_defaults.go"
+    text = path.read_text()
+    if "-DTW_BRIGHTNESS_PATH=" in text:
+        print("minuitwrp brightness path already patched")
+        return
+    if text.count(MINUITWRP_ANCHOR) != 1:
+        raise SystemExit(f"{path}: 未找到 HAS_DRM 锚点")
+    path.write_text(text.replace(MINUITWRP_ANCHOR, MINUITWRP_ANCHOR + MINUITWRP_ADDITION))
+    print("minuitwrp += -DTW_BRIGHTNESS_PATH")
+
+
 def check_prebuilt_exists(root):
     path = root / "external/magisk-prebuilt/prebuilt/Android.bp"
     if not path.is_file():
@@ -56,6 +85,7 @@ def main():
     check_prebuilt_exists(root)
     patch_magisk_probe(root)
     patch_libinstall_headers(root)
+    patch_minuitwrp_brightness(root)
 
 
 if __name__ == "__main__":
