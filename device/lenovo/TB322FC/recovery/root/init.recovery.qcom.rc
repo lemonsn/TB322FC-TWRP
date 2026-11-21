@@ -48,7 +48,22 @@ on property:ro.boot.usbcontroller=*
 on fs
     wait /dev/block/platform/soc/${ro.boot.bootdevice}
     symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
+
+    # PartitionManager queries BootControl while parsing recovery.fstab.
+    # Starting this HAL after the fstab is processed creates a circular wait
+    # and leaves recovery on the first logo with no UI.
+    start vendor.boot-qti
+
     write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
+
+# Recovery does not run Android's normal post-fs relabel pass.  Make sure
+# Virtual A/B state created by update_engine_sideload inherits
+# ota_metadata_file instead of unlabeled; otherwise Android can merge the COWs
+# but cannot remove merge_stats after the first successful boot.
+on post-fs
+    mkdir /metadata/ota 0750 root system
+    mkdir /metadata/ota/snapshots 0750 root system
+    restorecon --recursive /metadata/ota
 
 on property:twrp.modules.loaded=true
     # Mount firmware
@@ -83,7 +98,6 @@ on property:twrp.modules.loaded=true
     start vendor.keymint-spu-qti
     start vendor.minkdaemon
     start vendor.health-default
-    start vendor.boot-qti
     start vendor.gatekeeper_default
     start vendor.gatekeeper_spu
     start vendor.spdaemon
