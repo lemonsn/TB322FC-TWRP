@@ -18,6 +18,20 @@ LIBINSTALL_HEADER_NEW = (
     '    ],'
 )
 
+GUI_VOLD_INCLUDES_OLD = (
+    '        "external/freetype/include",\n'
+    '        "external/libpng"\n'
+    '\n'
+    '    ],'
+)
+GUI_VOLD_INCLUDES_NEW = (
+    '        "external/freetype/include",\n'
+    '        "external/libpng",\n'
+    '        "system/vold"\n'
+    '\n'
+    '    ],'
+)
+
 MINUITWRP_ANCHOR = (
     '\tmatches, err := filepath.Glob("external/libdrm/Android.*")\n'
     '\t_ = matches\n'
@@ -72,6 +86,18 @@ def patch_minuitwrp_brightness(root):
     print("minuitwrp += -DTW_BRIGHTNESS_PATH")
 
 
+def patch_gui_vold_includes(root):
+    path = root / "bootable/recovery/gui/Android.bp"
+    text = path.read_text()
+    if '"system/vold"' in text:
+        print("gui vold includes already patched")
+        return
+    if text.count(GUI_VOLD_INCLUDES_OLD) != 1:
+        raise SystemExit(f"{path}: 未找到 libguitwrp include_dirs 锚点")
+    path.write_text(text.replace(GUI_VOLD_INCLUDES_OLD, GUI_VOLD_INCLUDES_NEW))
+    print("libguitwrp += system/vold include dir")
+
+
 def check_prebuilt_exists(root):
     path = root / "external/magisk-prebuilt/prebuilt/Android.bp"
     if not path.is_file():
@@ -86,6 +112,7 @@ def main():
     patch_magisk_probe(root)
     patch_libinstall_headers(root)
     patch_minuitwrp_brightness(root)
+    patch_gui_vold_includes(root)
 
 
 if __name__ == "__main__":
