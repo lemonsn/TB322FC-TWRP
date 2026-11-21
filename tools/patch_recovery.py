@@ -32,6 +32,9 @@ GUI_VOLD_INCLUDES_NEW = (
     '    ],'
 )
 
+KEYSTORE_CALL_OLD = "android::keystore::copySqliteDb();"
+KEYSTORE_CALL_NEW = "android::keystore::syncKeystoreDb();"
+
 OZIP_DEFAULT_ANCHOR = "TW_X_OFFSET ?= 0\n"
 OZIP_LIST_ANCHOR = "    tw_use_key_code_touch_sync \\\n"
 OZIP_ASSIGN_ANCHOR = (
@@ -159,6 +162,18 @@ def patch_ozip_decrypt_key(root):
     print("twrp_defaults += -DTW_OZIP_DECRYPT_KEY")
 
 
+def patch_twrp_keystore_sync(root):
+    path = root / "bootable/recovery/twrp.cpp"
+    text = path.read_text()
+    if KEYSTORE_CALL_NEW in text:
+        print("twrp keystore sync already patched")
+        return
+    if text.count(KEYSTORE_CALL_OLD) != 1:
+        raise SystemExit(f"{path}: 未找到唯一的 copySqliteDb 调用")
+    path.write_text(text.replace(KEYSTORE_CALL_OLD, KEYSTORE_CALL_NEW))
+    print("twrp.cpp copySqliteDb -> syncKeystoreDb")
+
+
 def check_prebuilt_exists(root):
     path = root / "external/magisk-prebuilt/prebuilt/Android.bp"
     if not path.is_file():
@@ -175,6 +190,7 @@ def main():
     patch_minuitwrp_brightness(root)
     patch_gui_vold_includes(root)
     patch_ozip_decrypt_key(root)
+    patch_twrp_keystore_sync(root)
 
 
 if __name__ == "__main__":
