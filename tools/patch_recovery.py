@@ -41,6 +41,20 @@ RECOVERY_INCLUDES_NEW = (
 KEYSTORE_CALL_OLD = "android::keystore::copySqliteDb();"
 KEYSTORE_CALL_NEW = "android::keystore::syncKeystoreDb();"
 
+TWRPAPP_REQUIRED_LINES = (
+    "    me.twrp.twrpapp.apk \\\n"
+    "    privapp-permissions-twrpapp.xml \\\n"
+)
+
+CHECKFORAPP_ANCHOR = "\tif (Is_TWRP_App_In_System()) {\n"
+CHECKFORAPP_GUARD = (
+    "\tif (!TWFunc::Path_Exists(\"/system/bin/me.twrp.twrpapp.apk\")) {\n"
+    "\t\tLOGINFO(\"TWRP app not included in this build\\n\");\n"
+    "\t\tDataManager::SetValue(\"tw_app_install_status\", 2);\n"
+    "\t\treturn;\n"
+    "\t}\n"
+)
+
 OZIP_DEFAULT_ANCHOR = "TW_X_OFFSET ?= 0\n"
 OZIP_LIST_ANCHOR = "    tw_use_key_code_touch_sync \\\n"
 OZIP_ASSIGN_ANCHOR = (
@@ -87,6 +101,28 @@ def patch_magisk_probe(root):
         raise SystemExit(f"{path}: 未找到 magisk 探针 {MAGISK_PROBE_OLD}")
     path.write_text(text.replace(MAGISK_PROBE_OLD, MAGISK_PROBE_NEW))
     print("magisk probe -> prebuilt/Android.bp")
+
+
+def patch_exclude_twrpapp(root):
+    makefile = root / "bootable/recovery/Android.mk"
+    text = makefile.read_text()
+    if TWRPAPP_REQUIRED_LINES in text:
+        makefile.write_text(text.replace(TWRPAPP_REQUIRED_LINES, "", 1))
+        print("recovery: drop TWRP app prebuilts")
+    elif "me.twrp.twrpapp.apk" in text:
+        raise SystemExit(f"{makefile}: TWRP app 行布局与预期不符")
+    else:
+        print("recovery TWRP app already dropped")
+
+    functions = root / "bootable/recovery/twrp-functions.cpp"
+    text = functions.read_text()
+    if 'TWRP app not included in this build' in text:
+        print("checkforapp TWRP app guard already patched")
+        return
+    if text.count(CHECKFORAPP_ANCHOR) != 1:
+        raise SystemExit(f"{functions}: 未找到唯一的 checkforapp 锚点")
+    functions.write_text(text.replace(CHECKFORAPP_ANCHOR, CHECKFORAPP_GUARD + CHECKFORAPP_ANCHOR, 1))
+    print("checkforapp: skip prompt when TWRP app absent")
 
 
 def patch_libinstall_headers(root):
@@ -210,6 +246,7 @@ def main():
     patch_ozip_decrypt_key(root)
     patch_twrp_keystore_sync(root)
     patch_recovery_update_engine_includes(root)
+    patch_exclude_twrpapp(root)
 
 
 if __name__ == "__main__":
