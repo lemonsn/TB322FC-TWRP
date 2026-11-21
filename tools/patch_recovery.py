@@ -32,6 +32,12 @@ GUI_VOLD_INCLUDES_NEW = (
     '    ],'
 )
 
+RECOVERY_INCLUDES_OLD = "LOCAL_C_INCLUDES += system/vold \\\n\n"
+RECOVERY_INCLUDES_NEW = (
+    "LOCAL_C_INCLUDES += system/vold \\\n"
+    "    system/update_engine\n\n"
+)
+
 KEYSTORE_CALL_OLD = "android::keystore::copySqliteDb();"
 KEYSTORE_CALL_NEW = "android::keystore::syncKeystoreDb();"
 
@@ -174,6 +180,18 @@ def patch_twrp_keystore_sync(root):
     print("twrp.cpp copySqliteDb -> syncKeystoreDb")
 
 
+def patch_recovery_update_engine_includes(root):
+    path = root / "bootable/recovery/Android.mk"
+    text = path.read_text()
+    if "system/update_engine\n" in text:
+        print("recovery update_engine includes already patched")
+        return
+    if text.count(RECOVERY_INCLUDES_OLD) != 1:
+        raise SystemExit(f"{path}: 未找到唯一的 system/vold include 行")
+    path.write_text(text.replace(RECOVERY_INCLUDES_OLD, RECOVERY_INCLUDES_NEW))
+    print("recovery LOCAL_C_INCLUDES += system/update_engine")
+
+
 def check_prebuilt_exists(root):
     path = root / "external/magisk-prebuilt/prebuilt/Android.bp"
     if not path.is_file():
@@ -191,6 +209,7 @@ def main():
     patch_gui_vold_includes(root)
     patch_ozip_decrypt_key(root)
     patch_twrp_keystore_sync(root)
+    patch_recovery_update_engine_includes(root)
 
 
 if __name__ == "__main__":
