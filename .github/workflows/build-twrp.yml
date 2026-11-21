@@ -45,7 +45,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             git-core gnupg flex bison build-essential zip unzip curl wget \
             zlib1g-dev libncurses-dev libxml2-utils xsltproc fontconfig \
-            python3 rsync ccache lz4 cpio repo
+            python3 rsync lz4 cpio repo
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global color.ui false
@@ -74,14 +74,6 @@ jobs:
           sudo swapon --show || true
           sudo sysctl -w vm.swappiness=100 || true
           free -h
-
-      - name: Restore compiler cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ~/.cache/ccache
-          key: ccache-${{ runner.os }}-${{ env.RECOVERY_COMMIT }}-${{ github.run_id }}
-          restore-keys: |
-            ccache-${{ runner.os }}-${{ env.RECOVERY_COMMIT }}-
 
       - name: Apply TB322FC recovery patches
         working-directory: ${{ runner.temp }}/twrp/bootable/recovery
@@ -122,10 +114,6 @@ jobs:
           source build/envsetup.sh
           lunch "$LUNCH_TARGET"
           set +e
-          export USE_CCACHE=1
-          export CCACHE_DIR="$HOME/.cache/ccache"
-          export CCACHE_MAXSIZE=2G
-          export CCACHE_EXEC="$(command -v ccache)"
           export SOONG_GOMEMLIMIT=10GiB
           m -j3 recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           status=${PIPESTATUS[0]}
@@ -136,10 +124,6 @@ jobs:
             echo "=== last build log lines ==="; tail -n 40 "$GITHUB_WORKSPACE/build.log" || true
           fi
           exit "$status"
-
-      - name: Show compiler cache stats
-        if: always()
-        run: ccache -s || true
 
       - name: Verify recovery image
         run: |
