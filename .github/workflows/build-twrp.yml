@@ -13,9 +13,9 @@ on:
 env:
   MANIFEST_URL: https://github.com/TWRP-Test/platform_manifest_twrp_aosp.git
   MANIFEST_BRANCH: twrp-16.0
-  RECOVERY_REPO: https://github.com/polygraphene/android_bootable_recovery.git
+  RECOVERY_REPO: https://github.com/lemonsn/android_bootable_recovery.git
   RECOVERY_BRANCH: twrp-16.0-TB322FC
-  RECOVERY_COMMIT: ced4ad75f311fc8a3350e21de415c23d5f0aec74
+  RECOVERY_COMMIT: 482c8fb94f3ab390f003a4ee64dce45913d6eca7
   DEVICE_PATH: device/lenovo/TB322FC
   LUNCH_TARGET: twrp_TB322FC
   RECOVERY_PARTITION_BYTES: "104857600"
